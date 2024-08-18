@@ -20,6 +20,7 @@
 // SOFTWARE.
 
 pub mod communication;
+pub mod configuration;
 pub mod utilities;
 
 fn main() {
