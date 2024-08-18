@@ -8,3 +8,12 @@ aes = "0.8.4"
 anyhow = "1.0.86"
 rand = "0.8.5"
 rsa = "0.9.6"
+serde_json = "1.0.125"
+
+[dependencies.windows-sys]
+version = "0.59"
+features = [
+    "Win32_Foundation",
+    "Win32_System",
+    "Win32_System_LibraryLoader",
+]

@@ -6,7 +6,7 @@ pub mod tcp;
 pub struct HttpConfiguration {
     pub useragent: String,
     pub http_uri: String,
-    pub header: Vec<String>,
+    pub headers: Vec<String>,
     pub uri_append: String,
 }
 
@@ -18,5 +18,5 @@ pub struct PipeConfiguration {
 #[derive(Clone)]
 pub struct TcpConfiguration {
     pub host: String,
-    pub port: u64,
+    pub port: String,
 }

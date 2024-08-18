@@ -17,7 +17,7 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-use crate::utilities::Utilities;
+use crate::utilities::encoding::base64::Base64;
 use anyhow::{anyhow, Result};
 
 use rsa::{RsaPublicKey, Pkcs1v15Encrypt, pkcs8::DecodePublicKey};
@@ -51,7 +51,7 @@ impl Rsa {
 
 fn pubkey_string_to_struct(public_key: String) -> Result<RsaPublicKey> {
     // Transforming an base64 encoded public key to the RsaPublicKey struct
-    let public_der = Utilities::base64_decode(&public_key);
+    let public_der = Base64::decode(&public_key);
     let public_key = RsaPublicKey::from_public_key_der(&public_der)?;
     Ok(public_key)
 }
