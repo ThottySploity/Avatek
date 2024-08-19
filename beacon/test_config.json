@@ -1,0 +1,25 @@
+{
+    "beacon": {
+        "host": "127.0.0.1",
+        "port": "80",
+        "method": "http",
+        "methodinfo": {
+            "useragent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+            "http_uri": "/image/",
+            "headers": {
+                "0": "Accept: */*",
+                "1": "Content-Type: application/octet-stream",
+                "2": "Referer: http://google.com",
+                "3": "Pragma: no-cache",
+                "4": "Cache-Control: no-cache"
+            },
+            "append_ext": ".jpg",
+            "uri_append": "true"
+        }
+    },
+    "sleeptime": "10",
+    "jitter": "10",
+    "pubkey": "",
+    "spawnto_x64": "%windir%\\sysnative\\rundll32.exe",
+    "spawnto_x32": "%windir%\\syswow64\\rundll32.exe"
+}

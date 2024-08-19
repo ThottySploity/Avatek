@@ -35,4 +35,8 @@ impl Utilities {
 
         output
     }
+
+    pub fn strip_escape_chars(input: String) -> String {
+        input.replace("\"", "").to_string()
+    }
 }
