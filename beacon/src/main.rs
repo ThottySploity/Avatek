@@ -22,6 +22,23 @@ pub mod communication;
 pub mod configuration;
 pub mod utilities;
 
+use clap::Parser;
+
+#[derive(Parser)]
+struct Args {
+    #[clap(short)]
+    service: bool,
+}
+
 fn main() {
-    println!("Hello, world!");
+    let args = Args::parse();
+
+    if args.service {
+        // A service is a bit different than a regular exe file
+        // As we have this boolean from command-line, we need one code base
+        // That can both run as a standalone EXE aswell as run as a Service
+        // Pretty neat right :)
+
+        
+    }
 }   
