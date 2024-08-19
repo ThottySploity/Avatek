@@ -3,7 +3,7 @@
 ---
 
 <p align="center"><i>Avatek is an Advanced Threat Simulation framework written in the Rust language</i></p>
-<p align="center"><i>Created by <a href="ThottySploity">ThottySploity</a></i></p>
+<p align="center"><i>Created by <a href="https://github.com/ThottySploity">ThottySploity</a></i></p>
 
 ---
 
