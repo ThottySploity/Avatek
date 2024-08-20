@@ -19,10 +19,13 @@
 // SOFTWARE.
 
 pub mod communication;
+pub mod runtimes;
 pub mod configuration;
 pub mod utilities;
 
 use clap::Parser;
+
+use runtimes::{svc::RuntimeSvc, exe::RuntimeExe};
 
 #[derive(Parser)]
 struct Args {
@@ -39,6 +42,7 @@ fn main() {
         // That can both run as a standalone EXE aswell as run as a Service
         // Pretty neat right :)
 
-        
+        RuntimeSvc::new("Service".to_string());
     }
-}   
+    RuntimeExe::new();
+}
