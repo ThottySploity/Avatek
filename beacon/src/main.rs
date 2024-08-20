@@ -21,6 +21,7 @@
 pub mod communication;
 pub mod runtimes;
 pub mod configuration;
+pub mod functionality;
 pub mod utilities;
 
 use clap::Parser;

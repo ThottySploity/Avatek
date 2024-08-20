@@ -18,10 +18,3 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-pub struct RuntimeExe;
-
-impl RuntimeExe {
-    pub fn new() {
-        todo!();
-    }
-}
