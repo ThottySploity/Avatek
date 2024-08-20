@@ -38,10 +38,13 @@ fn main() {
     let args = Args::parse();
 
     if args.service {
-        // A service is a bit different than a regular exe file
-        // As we have this boolean from command-line, we need one code base
-        // That can both run as a standalone EXE aswell as run as a Service
-        // Pretty neat right :)
+
+        // A service is a bit different from a regular EXE file
+        // For instance, you can't run a EXE file as a service (atleast not for long)
+        // So we can act both as a standalone EXE aswell as a Service we need the functionality to run as both
+        // For this reason we have a RuntimeSvc and a RuntimeExe
+        // Using this functionality we have one code base to rule them all
+        // Pretty nifty right?
 
         RuntimeSvc::new("Service".to_string());
     }
