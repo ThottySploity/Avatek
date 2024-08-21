@@ -48,5 +48,7 @@ fn main() {
 
         RuntimeSvc::new("Service".to_string());
     }
+
+    // If the service boolean is not given, we run the standard EXE runtime
     RuntimeExe::new();
 }
