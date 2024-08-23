@@ -29,6 +29,8 @@ pub struct Tcp;
 // So any beacon can be turned into a pivot listener that bridges the gap between machines
 // Without having multiple beacons reach out to the C2 from the same network.
 
+// The functionality of the TCP needs to be bidirectional, currently it's unidirectional
+
 impl Tcp {
     pub fn connect(host: String, port: String) -> Result<TcpStream> {
         // Functionality so that beacon can connect to a TCP server

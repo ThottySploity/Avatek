@@ -17,3 +17,33 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+
+
+// Just like the TCP implementation, this implementation also is required to be bidirectional.
+// The reasoning behind this is the exact same as with the TCP implementation;
+// It will cause only one beacon to reach out to the C2 at a time (which reduces detectability)
+// As of right now it's not bidirectional but unidirectional
+
+pub struct Pipes;
+
+impl Pipes {
+    pub fn connect() {
+        // Connecting to a pipe
+        todo!();
+    }
+
+    pub fn peek() {
+        // Peeking into a pipe, this is to say if there are bytes in the pipe
+        todo!();
+    }
+
+    pub fn read() {
+        // Reading the information out of the pipe
+        todo!();
+    }
+
+    pub fn write() {
+        // Writing information to the pipe
+        todo!();
+    }
+}
