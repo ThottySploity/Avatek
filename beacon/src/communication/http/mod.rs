@@ -17,3 +17,24 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+
+use anyhow::{Result};
+use reqwest::blocking::Client;
+
+pub struct Http;
+
+impl Http {
+    pub fn get(url: String) -> Result<String> {
+        let client = Client::new();
+        let url: reqwest::Url = url.parse()?;
+        let resp = client.get(url).send()?;
+        Ok(resp.text()?)
+    }
+
+    pub fn post(url: String, body: String) -> Result<String> {
+        let client = Client::new();
+        let url: reqwest::Url = url.parse()?;
+        let resp = client.post(url).body(body).send()?;
+        Ok(resp.text()?)
+    }
+}
