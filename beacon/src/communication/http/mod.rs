@@ -25,6 +25,8 @@ pub struct Http;
 
 impl Http {
     pub fn get(url: String) -> Result<String> {
+        // Sending a GET request using HTTP
+
         let client = Client::new();
         let url: reqwest::Url = url.parse()?;
         let resp = client.get(url).send()?;
@@ -32,6 +34,8 @@ impl Http {
     }
 
     pub fn post(url: String, body: String) -> Result<String> {
+        // Sending a POST request using HTTP
+        
         let client = Client::new();
         let url: reqwest::Url = url.parse()?;
         let resp = client.post(url).body(body).send()?;

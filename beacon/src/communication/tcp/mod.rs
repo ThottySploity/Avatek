@@ -17,3 +17,35 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+
+use anyhow::Result;
+use std::net::TcpStream;
+
+use std::io::{Read, Write};
+
+pub struct Tcp;
+
+// This impl still requires the Listener logic
+// So any beacon can be turned into a pivot listener that bridges the gap between machines
+// Without having multiple beacons reach out to the C2 from the same network.
+
+impl Tcp {
+    pub fn connect(host: String, port: String) -> Result<TcpStream> {
+        // Functionality so that beacon can connect to a TCP server
+        let stream = TcpStream::connect(&format!("{}:{}", host, port))?;
+        Ok(stream)
+    }
+
+    pub fn read(mut stream: TcpStream) -> Result<Vec<u8>> {
+        // Reading bytes from the TCP stream
+        let mut buffer = Vec::new();
+        stream.read(&mut buffer)?;
+        Ok(buffer)
+    }
+
+    pub fn write(mut stream: TcpStream, data: Vec<u8>) -> Result<()> {
+        // Writing bytes to the TCP stream
+        stream.write(&data)?;
+        Ok(())
+    }
+}
