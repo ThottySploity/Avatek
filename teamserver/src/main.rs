@@ -18,7 +18,52 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+pub mod encryption;
+pub mod keys;
+pub mod utilities;
+
+use keys::Keys;
+
+use env_logger::Env;
+use clap::Parser;
+
+#[derive(Parser)]
+#[clap(about, author)]
+pub struct Args {
+
+    /// Management side IP address of the teamserver
+    #[clap(short, long, default_value = "127.0.0.1")]
+    teamserver_ip_address: String,
+
+    /// Management side Port of the teamserver
+    #[clap(short, long, default_value = "1337")]
+    port: u64,
+
+    /// Location of the profile.toml file
+    #[clap(long, default_value = "")]
+    profile: String,
+
+    /// Create keypair for Avatek
+    #[clap(short, long)]
+    generate: bool,
+
+    /// Force an overwrite of any found keys
+    #[clap(short)]
+    force: bool,
+}
 
 fn main() {
-    println!("Hello, world!");
+    let args = Args::parse();
+    env_logger::Builder::from_env(Env::default().default_filter_or("debug")).init();
+    
+    if !Keys::exists() || args.generate {
+        // This function will generate the keypairs for;
+        //  • teamclient
+        //  • teamserver
+        //  • beacons
+
+        // This function will be called if either the keys do not exist yet
+        // Or if an operator overwrites the current keys
+        Keys::generate(args.force);
+    }
 }
