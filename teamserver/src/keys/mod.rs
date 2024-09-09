@@ -57,7 +57,6 @@ impl Keys {
         }
     }
 
-    #[cfg(target_os = "windows")]
     pub fn get_key_location(find: &str) -> Result<String> {
         for kloc in key_locations() {
             for kname in key_names() {
@@ -71,11 +70,6 @@ impl Keys {
             }
         }
         Err(anyhow!("Key not found"))
-    }
-
-    #[cfg(target_os = "linux")]
-    pub fn get_key_location(key: String) -> String {
-        todo!();
     }
 }
 
