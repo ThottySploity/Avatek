@@ -1,4 +1,4 @@
-<p align="center"> <img src="https://github.com/ThottySploity/Halcyon/blob/main/images/logo.png" alt="Logo" /> </p>
+<p align="center"> <img src="https://github.com/ThottySploity/Halcyon/blob/main/images/logo.jpg" alt="Logo" /> </p>
 
 ---
 
