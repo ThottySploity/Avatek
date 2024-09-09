@@ -1,6 +1,8 @@
 use crate::encryption::rsa::Rsa;
 use crate::utilities::Utils;
 
+use anyhow::{anyhow, Result};
+
 use log::{error, info};
 
 pub struct Keys;
@@ -53,6 +55,27 @@ impl Keys {
                 }
             }
         }
+    }
+
+    #[cfg(target_os = "windows")]
+    pub fn get_key_location(find: &str) -> Result<String> {
+        for kloc in key_locations() {
+            for kname in key_names() {
+                let key = format!("{}{}", kloc, kname);
+                if kloc.contains(&remove_prefix_and_suffix(kname.clone())) {
+
+                    if key.contains(find) {
+                        return Ok(key);
+                    }
+                }
+            }
+        }
+        Err(anyhow!("Key not found"))
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn get_key_location(key: String) -> String {
+        todo!();
     }
 }
 

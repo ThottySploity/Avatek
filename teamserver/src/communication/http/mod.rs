@@ -19,34 +19,27 @@
 // SOFTWARE.
 
 use anyhow::Result;
+use reqwest::blocking::Client;
 
-use rsa::{RsaPrivateKey, RsaPublicKey};
-use rsa::pkcs1::{
-    EncodeRsaPublicKey, EncodeRsaPrivateKey, LineEnding,
-    DecodeRsaPrivateKey
-};
+pub struct Http;
 
-pub struct Rsa;
+impl Http {
 
-impl Rsa {
-    pub fn generate(bits: usize) -> Result<RsaPrivateKey> {
-        let mut rng = rand::thread_rng();
-        Ok(RsaPrivateKey::new(&mut rng, bits)?)
+    pub fn get(url: String) -> Result<String> {
+        // Sending a GET request using HTTP
+
+        let client = Client::new();
+        let url: reqwest::Url = url.parse()?;
+        let resp = client.get(url).send()?;
+        Ok(resp.text()?)
     }
 
-    pub fn public_key_from_private_key(private_key: RsaPrivateKey) -> RsaPublicKey {
-        RsaPublicKey::from(&private_key)
-    }
+    pub fn post(url: String, body: String) -> Result<String> {
+        // Sending a POST request using HTTP
 
-    pub fn export_private_to_pem(private_key: RsaPrivateKey, name: &str) -> Result<()> {
-        Ok(private_key.write_pkcs1_pem_file(name, LineEnding::default())?)
-    }
-
-    pub fn export_public_to_pem(public_key: RsaPublicKey, name: &str) -> Result<()> {
-        Ok(public_key.write_pkcs1_pem_file(name, LineEnding::default())?)
-    }
-
-    pub fn load_private_key(name: &str) -> Result<RsaPrivateKey> {
-        Ok(RsaPrivateKey::read_pkcs1_pem_file(name)?)
+        let client = Client::new();
+        let url: reqwest::Url = url.parse()?;
+        let resp = client.post(url).body(body).send()?;
+        Ok(resp.text()?)
     }
 }

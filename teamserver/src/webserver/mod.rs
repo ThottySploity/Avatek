@@ -18,35 +18,29 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-use anyhow::Result;
+use actix_web::{web, App, HttpServer, HttpResponse};
+use log::info;
+use rsa::RsaPrivateKey;
 
-use rsa::{RsaPrivateKey, RsaPublicKey};
-use rsa::pkcs1::{
-    EncodeRsaPublicKey, EncodeRsaPrivateKey, LineEnding,
-    DecodeRsaPrivateKey
-};
+pub struct Webserver;
 
-pub struct Rsa;
+impl Webserver {
+    pub async fn start(ip: String, port: u64, private_key: RsaPrivateKey) -> std::io::Result<()> {
+        // Management side webserver
 
-impl Rsa {
-    pub fn generate(bits: usize) -> Result<RsaPrivateKey> {
-        let mut rng = rand::thread_rng();
-        Ok(RsaPrivateKey::new(&mut rng, bits)?)
+        info!("Starting management webserver on: {}:{}", ip, port);
+
+        HttpServer::new(move || {
+            App::new()
+                .app_data(web::Data::new(private_key.clone()))
+                .route("/mgmt/{call}", web::post().to(handle_mgmt_call))
+        })
+        .bind(&format!("{}:{}", ip, port))?
+        .run()
+        .await
     }
+}
 
-    pub fn public_key_from_private_key(private_key: RsaPrivateKey) -> RsaPublicKey {
-        RsaPublicKey::from(&private_key)
-    }
-
-    pub fn export_private_to_pem(private_key: RsaPrivateKey, name: &str) -> Result<()> {
-        Ok(private_key.write_pkcs1_pem_file(name, LineEnding::default())?)
-    }
-
-    pub fn export_public_to_pem(public_key: RsaPublicKey, name: &str) -> Result<()> {
-        Ok(public_key.write_pkcs1_pem_file(name, LineEnding::default())?)
-    }
-
-    pub fn load_private_key(name: &str) -> Result<RsaPrivateKey> {
-        Ok(RsaPrivateKey::read_pkcs1_pem_file(name)?)
-    }
+async fn handle_mgmt_call(call: web::Path<String>) -> HttpResponse {
+    HttpResponse::Ok().body(format!("Received variable: {}", call))
 }

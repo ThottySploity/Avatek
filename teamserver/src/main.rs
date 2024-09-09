@@ -18,11 +18,15 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+pub mod communication;
 pub mod encryption;
 pub mod keys;
 pub mod utilities;
+pub mod webserver;
 
+use encryption::rsa::Rsa;
 use keys::Keys;
+use webserver::Webserver;
 
 use env_logger::Env;
 use clap::Parser;
@@ -52,7 +56,8 @@ pub struct Args {
     force: bool,
 }
 
-fn main() {
+#[actix::main]
+async fn main() {
     let args = Args::parse();
     env_logger::Builder::from_env(Env::default().default_filter_or("debug")).init();
     
@@ -65,5 +70,13 @@ fn main() {
         // This function will be called if either the keys do not exist yet
         // Or if an operator overwrites the current keys
         Keys::generate(args.force);
+    }
+
+    if let Ok(private_key_location) = Keys::get_key_location("private_key_beacon") {
+        if let Ok(private_key) = Rsa::load_private_key(&private_key_location) {
+
+            // Import the keys for the Teamserver to communicate
+            let _ = Webserver::start(args.teamserver_ip_address, args.port, private_key).await;
+        }
     }
 }

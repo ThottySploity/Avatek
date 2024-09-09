@@ -18,35 +18,5 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-use anyhow::Result;
+pub mod http;
 
-use rsa::{RsaPrivateKey, RsaPublicKey};
-use rsa::pkcs1::{
-    EncodeRsaPublicKey, EncodeRsaPrivateKey, LineEnding,
-    DecodeRsaPrivateKey
-};
-
-pub struct Rsa;
-
-impl Rsa {
-    pub fn generate(bits: usize) -> Result<RsaPrivateKey> {
-        let mut rng = rand::thread_rng();
-        Ok(RsaPrivateKey::new(&mut rng, bits)?)
-    }
-
-    pub fn public_key_from_private_key(private_key: RsaPrivateKey) -> RsaPublicKey {
-        RsaPublicKey::from(&private_key)
-    }
-
-    pub fn export_private_to_pem(private_key: RsaPrivateKey, name: &str) -> Result<()> {
-        Ok(private_key.write_pkcs1_pem_file(name, LineEnding::default())?)
-    }
-
-    pub fn export_public_to_pem(public_key: RsaPublicKey, name: &str) -> Result<()> {
-        Ok(public_key.write_pkcs1_pem_file(name, LineEnding::default())?)
-    }
-
-    pub fn load_private_key(name: &str) -> Result<RsaPrivateKey> {
-        Ok(RsaPrivateKey::read_pkcs1_pem_file(name)?)
-    }
-}
