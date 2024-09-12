@@ -23,11 +23,13 @@ use anyhow::Result;
 use crate::encoding::base64::Base64;
 
 use rsa::{RsaPrivateKey, RsaPublicKey, Pkcs1v15Encrypt};
-use rsa::pkcs8::EncodePublicKey;
+use rsa::pkcs8::{EncodePublicKey, EncodePrivateKey, DecodePublicKey};
 use rsa::pkcs1::{
     EncodeRsaPublicKey, EncodeRsaPrivateKey, LineEnding,
-    DecodeRsaPrivateKey
+    DecodeRsaPublicKey, DecodeRsaPrivateKey
 };
+use rsa::pkcs1v15::Pkcs1v15Sign;
+use rsa::sha2::{Digest, Sha256};
 
 pub struct Rsa;
 
@@ -63,6 +65,12 @@ impl Rsa {
         Ok(RsaPrivateKey::read_pkcs1_pem_file(name)?)
     }
 
+    pub fn load_public_key(name: &str) -> Result<RsaPublicKey> {
+        // Loading a public key from a PEM file
+
+        Ok(RsaPublicKey::read_pkcs1_pem_file(name)?)
+    }
+
     pub fn public_key_to_string(public_key: RsaPublicKey) -> Result<String> {
         // Transforming the public key to sendable data using URL safe base64 encoding
 
@@ -71,10 +79,59 @@ impl Rsa {
         Ok(Base64::encode(public_key_der))
     }
 
-    pub fn decrypt(private_key: RsaPrivateKey, enc_data: Vec<u8>) -> Result<String> {
+    pub fn private_key_to_string(private_key: RsaPrivateKey) -> Result<String> {
+        let binding = private_key.to_pkcs8_der()?;
+        let private_key_der = binding.as_bytes();
+        let private_key_der_base64 = Base64::encode(private_key_der);
+        Ok(private_key_der_base64)
+    }
+
+    pub fn public_key_string_to_struct(public_key: String) -> Result<RsaPublicKey> {
+        let public_der = Base64::decode(&public_key);
+        let public_key = RsaPublicKey::from_public_key_der(&public_der)?;
+        Ok(public_key)
+    }
+
+    pub fn encrypt(public_key: RsaPublicKey, data: Vec<u8>) -> Result<Vec<u8>> {
+        // Encrypting data using RSA with a RSA public key
+
+        let mut rng = rand::thread_rng();
+        let encrypted_data = public_key.encrypt(&mut rng, Pkcs1v15Encrypt, &data[..])?;
+        Ok(encrypted_data)
+    }
+
+    pub fn decrypt(private_key: RsaPrivateKey, enc_data: Vec<u8>) -> Result<Vec<u8>> {
         // Decrypting data that was encrypted using the teamservers public RSA key
 
         let decrypted_data = private_key.decrypt(Pkcs1v15Encrypt, &enc_data)?;
-        Ok(std::str::from_utf8(&decrypted_data)?.to_string())
+        Ok(decrypted_data)
     }
-} 
+
+    pub fn verify(public_key: RsaPublicKey, data: Vec<u8>, signature: &[u8]) -> bool {
+        // Verifying a signature by it's public key
+
+        let padding = Pkcs1v15Sign::new::<Sha256>();
+        let digest = sha256_hash(data);
+
+        if let Ok(_) = public_key.verify(padding, &digest, signature) {
+            return true;
+        }
+        false
+    }
+
+    pub fn sign(private_key: RsaPrivateKey, data: Vec<u8>) -> Result<Vec<u8>> {
+        // Signing a message for integrity and authenticity using a private key
+
+        let padding = Pkcs1v15Sign::new::<Sha256>();
+        let digest = sha256_hash(data);
+        let signature = private_key.sign(padding, &digest)?;
+        Ok(signature)
+    }
+}
+
+fn sha256_hash(input: Vec<u8>) -> Vec<u8> {
+    let mut hasher = Sha256::new();
+    hasher.update(input);
+    let digest = hasher.finalize();
+    digest.to_vec()
+}

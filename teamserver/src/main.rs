@@ -28,7 +28,7 @@ pub mod webserver;
 use encryption::aes::Aes;
 use encryption::rsa::Rsa;
 use keys::Keys;
-use webserver::Webserver;
+use webserver::ManagementServer;
 
 use env_logger::Env;
 use clap::Parser;
@@ -36,7 +36,6 @@ use clap::Parser;
 #[derive(Parser)]
 #[clap(about, author)]
 pub struct Args {
-
     /// Management side IP address of the teamserver
     #[clap(short, long, default_value = "127.0.0.1")]
     teamserver_ip_address: String,
@@ -56,6 +55,14 @@ pub struct Args {
     /// Force an overwrite of any found keys
     #[clap(short)]
     force: bool,
+
+    /// Username for authentication (to retrieve teamclient keys)
+    #[clap(long)]
+    username: String,
+
+    /// Password for authentication (to retrieve teamclient keys)
+    #[clap(long)]
+    password: String,
 }
 
 #[actix::main]
@@ -74,11 +81,11 @@ async fn main() {
         Keys::generate(args.force);
     }
 
-    if let Ok(private_key_location) = Keys::get_key_location("private_key_beacon") {
+    if let Ok(private_key_location) = Keys::get_key_location("private_key_teamserver") {
         if let Ok(private_key) = Rsa::load_private_key(&private_key_location) {
 
             // Import the keys for the Teamserver to communicate
-            let _ = Webserver::start(args.teamserver_ip_address, args.port, private_key).await;
+            let _ = ManagementServer::start(args.teamserver_ip_address, args.port, args.username, args.password, private_key).await;
         }
     }
 }

@@ -20,7 +20,7 @@
 
 use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit, OsRng},
-    Aes256Gcm, Nonce, Key
+    Aes256Gcm
 };
 
 pub struct Aes;
@@ -31,6 +31,15 @@ impl Aes {
         // Generating an AES key to be used in the encryption
         let key: [u8; 32] = Aes256Gcm::generate_key(OsRng).into();
         key
+    }
+
+    pub fn transform(input: Vec<u8>) -> [u8; 32] {
+        let mut output: [u8; 32] = [0; 32];
+
+        for i in 0..output.len() {
+            output[i as usize] = input[i as usize];
+        }
+        output
     }
 
     pub fn encrypt(key: [u8; 32], data: Vec<u8>) -> Vec<u8> {
