@@ -25,7 +25,6 @@ pub mod keys;
 pub mod utilities;
 pub mod webserver;
 
-use encryption::aes::Aes;
 use encryption::rsa::Rsa;
 use keys::Keys;
 use webserver::ManagementServer;

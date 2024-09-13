@@ -18,34 +18,43 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-pub mod beacondecoder;
+pub struct BeaconDecoder {
+    id: String,
+    req: String,
+}
 
-use anyhow::Result;
+impl BeaconDecoder {
+    pub fn new(body: String) -> Self {
+        
+        if body.contains(":") {
+            let msg: Vec<&str> = body.split(":").collect();
+            
+            if msg.len() >= 2 {
 
-use std::path::Path;
-use std::fs;
+                let id = msg[0];
+                let req = msg[1];
 
-use log::error;
-
-pub struct Utils;
-
-impl Utils {
-
-    pub fn is_path_valid(path: &str) -> bool {
-        // Validates if a given path exists on the machine
-        Path::new(&path).exists()
-    }
-
-    pub fn create_path(path: &str) -> bool {
-        // Creates a directory
-        if let Err(e) = fs::create_dir_all(path) {
-            error!("Failed creating path: {} with error: {}", path, e);
-            return false;
+                return Self {
+                    id: id.to_string(),
+                    req: req.to_string(),
+                }
+            }
         }
-        true
+
+        // This function should not be called (if the teamclient is used as intended)
+        Self {
+            id: "".to_string(),
+            req: "".to_string(),
+        }
     }
 
-    pub fn convert(input: &[u8]) -> Result<String> {
-        Ok(std::str::from_utf8(&input)?.to_string())
+    pub fn id(&self) -> String {
+        // Getting the Beacon ID
+        self.id.clone()
+    }
+
+    pub fn res(&self) -> String {
+        // Getting the Beacon String
+        self.req.clone()
     }
 }
