@@ -27,7 +27,7 @@ pub mod webserver;
 
 use encryption::rsa::Rsa;
 use keys::Keys;
-use webserver::ManagementServer;
+use webserver::endpoints::mgmt::ManagementServer;
 
 use env_logger::Env;
 use clap::Parser;
@@ -80,11 +80,8 @@ async fn main() {
         Keys::generate(args.force);
     }
 
-    if let Ok(private_key_location) = Keys::get_key_location("private_key_teamserver") {
-        if let Ok(private_key) = Rsa::load_private_key(&private_key_location) {
-
-            // Import the keys for the Teamserver to communicate
-            let _ = ManagementServer::start(args.teamserver_ip_address, args.port, args.username, args.password, private_key).await;
-        }
+    if let Ok(private_key) = Rsa::load_private_key("private_key_teamserver") {
+        // Import the keys for the Teamserver to communicate
+        let _ = ManagementServer::start(args.teamserver_ip_address, args.port, args.username, args.password, private_key).await;
     }
 }
