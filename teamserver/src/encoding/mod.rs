@@ -19,3 +19,4 @@
 // SOFTWARE.
 
 pub mod base64;
+pub mod netbios;
