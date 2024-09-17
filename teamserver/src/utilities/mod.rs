@@ -20,12 +20,13 @@
 
 pub mod beacondecoder;
 
+use crate::webserver::endpoints::listeners::metadata::MetaData;
+
 use anyhow::Result;
+use log::error;
 
 use std::path::Path;
 use std::fs;
-
-use log::error;
 
 pub struct Utils;
 
@@ -46,6 +47,17 @@ impl Utils {
     }
 
     pub fn convert(input: &[u8]) -> Result<String> {
+        // Convert bytes to its UTF8 representation
         Ok(std::str::from_utf8(&input)?.to_string())
+    }
+
+    pub fn struct_to_json(data: MetaData) -> Result<String> {
+        // Converting the MetaData structure to a JSON string
+        Ok(serde_json::to_string(&data)?)
+    }
+
+    pub fn json_to_struct(data: String) -> Result<MetaData> {
+        // Converting a JSON string to the MetaData structure
+        Ok(serde_json::from_str(&data)?)
     }
 }
