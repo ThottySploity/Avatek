@@ -18,6 +18,15 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-pub mod base64;
-pub mod netbios;
-pub mod sha256;
+use rsa::sha2::{Digest, Sha256};
+
+pub struct Sha256Hash;
+
+impl Sha256Hash {
+    pub fn hash(input: Vec<u8>) -> Vec<u8> {
+        let mut hasher = Sha256::new();
+        hasher.update(input);
+        let digest = hasher.finalize();
+        digest.to_vec()
+    }
+}

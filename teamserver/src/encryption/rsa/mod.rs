@@ -21,6 +21,7 @@
 use anyhow::Result;
 
 use crate::encoding::base64::Base64;
+use crate::encoding::sha256::Sha256Hash;
 use crate::keys::Keys;
 
 use rsa::{RsaPrivateKey, RsaPublicKey, Pkcs1v15Encrypt};
@@ -30,7 +31,6 @@ use rsa::pkcs1::{
     DecodeRsaPublicKey, DecodeRsaPrivateKey
 };
 use rsa::pkcs1v15::Pkcs1v15Sign;
-use rsa::sha2::{Digest, Sha256};
 
 pub struct Rsa;
 
@@ -111,8 +111,8 @@ impl Rsa {
     pub fn verify(public_key: RsaPublicKey, data: Vec<u8>, signature: &[u8]) -> bool {
         // Verifying a signature by it's public key
 
-        let padding = Pkcs1v15Sign::new::<Sha256>();
-        let digest = sha256_hash(data);
+        let padding = Pkcs1v15Sign::new::<rsa::sha2::Sha256>();
+        let digest = Sha256Hash::hash(data);
 
         if let Ok(_) = public_key.verify(padding, &digest, signature) {
             return true;
@@ -123,16 +123,9 @@ impl Rsa {
     pub fn sign(private_key: RsaPrivateKey, data: Vec<u8>) -> Result<Vec<u8>> {
         // Signing a message for integrity and authenticity using a private key
 
-        let padding = Pkcs1v15Sign::new::<Sha256>();
-        let digest = sha256_hash(data);
+        let padding = Pkcs1v15Sign::new::<rsa::sha2::Sha256>();
+        let digest = Sha256Hash::hash(data);
         let signature = private_key.sign(padding, &digest)?;
         Ok(signature)
     }
-}
-
-fn sha256_hash(input: Vec<u8>) -> Vec<u8> {
-    let mut hasher = Sha256::new();
-    hasher.update(input);
-    let digest = hasher.finalize();
-    digest.to_vec()
 }
