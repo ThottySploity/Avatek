@@ -30,12 +30,13 @@ use anyhow::{anyhow, Result};
 use log::{error};
 use rsa::RsaPrivateKey;
 
-// Code for retrieving command from body
-pub fn retrieve_command(body: String, private_key: RsaPrivateKey) -> Result<String> {
+// Retrieving the command of that has been sent, along with the AES key that was used to encrypt it.
+pub fn retrieve_command(body: String, private_key: RsaPrivateKey) -> Result<(String, [u8; 32])> {
     let (encrypted_data, encrypted_key, _) = retrieve_info(body)?;
     let decrypted_key = Rsa::decrypt(private_key.clone(), encrypted_key)?;
-    let decrypted_command = Aes::decrypt(Aes::transform(decrypted_key), encrypted_data);
-    Ok(Utils::convert(&decrypted_command)?.to_string())
+    let aes_key = Aes::transform(decrypted_key);
+    let decrypted_command = Aes::decrypt(aes_key, encrypted_data);
+    Ok((Utils::convert(&decrypted_command)?.to_string(), aes_key))
 }
 
 // Code for retrieving data from body

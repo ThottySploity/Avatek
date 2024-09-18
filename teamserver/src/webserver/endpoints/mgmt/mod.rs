@@ -22,6 +22,7 @@ use crate::utilities::beacondecoder::BeaconDecoder;
 use crate::webserver::{QUEUE, endpoints::*, endpoints::listeners::Listeners};
 
 use log::{debug, error, info};
+use serde_json::{json};
 use rsa::RsaPrivateKey;
 use actix_web::{web, HttpResponse, HttpServer, App};
 
@@ -71,12 +72,15 @@ async fn handle_mgmt_call(api: web::Path<String>, body: String, private_key: web
             }
 
             // Retrieving the command from the HTTP body
-            if let Ok(command) = retrieve_command(body.clone(), private_key.get_ref().clone()) {
+            if let Ok((command, aes_key)) = retrieve_command(body.clone(), private_key.get_ref().clone()) {
                 if let Ok(mut queue) = QUEUE.lock() {
                     let beacon = BeaconDecoder::new(command.to_string());
                     debug!("Added a command for beacon: {}", beacon.id());
                     queue.commands.push((beacon.id(), beacon.res()));
                     debug!("Length of queue: {}", queue.commands.len());
+
+                    let response = format_response_payload(command, format!("Added job for: {}, Length of queue is now: {}", beacon.id(), queue.commands.len()), aes_key);
+                    return HttpResponse::Ok().body(response)
                 }
             }
         },
@@ -88,8 +92,40 @@ async fn handle_mgmt_call(api: web::Path<String>, body: String, private_key: web
             }
 
             // Parse the resulting command to the Listener impl
-            if let Ok(command) = retrieve_command(body.clone(), private_key.get_ref().clone()) {
-                let _ = Listeners::handle_listener_call(command).await;
+            if let Ok((command, aes_key)) = retrieve_command(body.clone(), private_key.get_ref().clone()) {
+
+                let msg: Vec<&str> = command.split(":").collect();
+                if msg.len() >= 1 {
+                    let method = msg[0].to_string();
+
+                    match method.as_str() {
+                        "add" => {
+                            // Adding a listener to the teamserver
+                            if let Ok(res) = Listeners::handle_listener_start(command.clone()).await {
+                                // Res needs to be encrypted
+
+                                let response = format_response_payload(command.clone(), res, aes_key);
+                                return HttpResponse::Ok().body(response);
+                            }
+                        },
+                        "remove" => {
+                            // Removing any active listener as dictated by the contents of command variable
+                            if Listeners::handle_listener_remove(command).await {
+                                return HttpResponse::Ok().into();
+                            }
+                        },  
+                        "get" => {
+                            // Getting all the active listeners
+                            if let Ok(list) = Listeners::handle_listener_get().await {
+                                // List needs to be encrypted
+                                let response = format_response_payload(command, list, aes_key);
+                                return HttpResponse::Ok().body(response);
+                            }
+                        },
+                        _ => return HttpResponse::NotFound().into(), 
+                    };
+                }
+
             }
         },
         _ => return HttpResponse::NotFound().into(),
@@ -176,4 +212,21 @@ fn get_encrypted_private_key(body: String, username: String, password: String, p
     }
 
     Err(anyhow!(""))
+}
+
+fn format_response_payload(command: String, res: String, aes_key: [u8; 32]) -> String {
+    if let Ok(encoded_response) = encode_result_in_json(command, res) {
+        let encrypted_response = Aes::encrypt(aes_key, encoded_response.as_bytes().to_vec());
+        let encoded_encrypted_response = Base64::encode(&encrypted_response);
+        return encoded_encrypted_response
+    }
+    "Failed to format response payload".to_string()
+}
+
+fn encode_result_in_json(command: String, result: String) -> Result<String> {
+    let encoded_response = json!({
+        "command": format!("{}", command),
+        "result": format!("{}", result),
+    });
+    Ok(serde_json::to_string(&encoded_response)?)
 }

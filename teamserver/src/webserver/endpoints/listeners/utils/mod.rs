@@ -38,7 +38,7 @@ impl ListenerUtils {
         }
     }
 
-    pub async fn remove_listener_from_queue(listener_type: String, host: String, port: String) {
+    pub async fn remove_listener_from_queue(listener_type: String, host: String, port: String) -> bool {
         // Removing an unused listener
         if let Ok(mut listeners) = LISTENERS.lock() {
             for (index, (active_listener_type, active_host, active_port, listener_handle)) in listeners.listeners.clone().iter().enumerate() {
@@ -46,12 +46,13 @@ impl ListenerUtils {
                     
                     // First since it does exist, we need to stop the listener
                     listener_handle.stop(true).await; // Gracefull stop of the listener
-                    
                     debug!("Removed: {}:{}:{} from active listeners", listener_type, host, port);
                     listeners.listeners.remove(index);
+                    return true;
                 }
             }
         }
+        false
     }
 
     pub fn check_listener_in_queue(listener_type: String, host: String, port: String) -> bool {

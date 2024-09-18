@@ -20,6 +20,7 @@
 
 pub mod metadata;
 pub mod utils;
+use crate::webserver::LISTENERS;
 use crate::webserver::endpoints::listeners::utils::ListenerUtils;
 
 use actix_web::{web, rt, HttpServer, App, Responder, HttpRequest};
@@ -30,74 +31,68 @@ use log::{info};
 pub struct Listeners;
 
 impl Listeners {
-    pub async fn handle_listener_call(info: String) -> Result<()> {
-        // The message was already verified in the mgmt endpoint
+    
+    pub async fn handle_listener_get() -> Result<String> {
+        // Returns all the Active listeners
+
+        if let Ok(listeners) = LISTENERS.lock() {
+            let mut all_listeners: Vec<(usize, String, String, String)> = Vec::new();
+
+            for (index, (listener_type, host, port, _)) in listeners.listeners.clone().iter().enumerate() {
+                all_listeners.push((index, listener_type.to_string(), host.to_string(), port.to_string()));
+            }
+
+            return Ok(serde_json::to_string(&all_listeners)?);
+        }
+
+        Err(anyhow!("Listener does not exist"))
+    }
+
+    pub async fn handle_listener_remove(info: String) -> bool {
+        // Returns if a listener has been removed
 
         let msg: Vec<&str> = info.split(":").collect();
 
         if msg.len() >= 4 {
-            let listener_meth = msg[0].to_string();
             let listener_type = msg[1].to_string();
             let listener_host = msg[2].to_string();
-            let listener_port = msg[3].to_string();
+            let listener_port = msg[3].to_string(); 
 
-            // Example msg:
-            // add:http:127.0.0.1:1338
-            // remove:http:127.0.0.1:1338
-
-            match listener_meth.as_str() {
-                "add" => {
-                    match listener_type.as_str() {
-                        "http" => {
-                            if !ListenerUtils::check_listener_in_queue(listener_type.clone(), listener_host.clone(), listener_port.clone()) {
-                                // Listener is not added yet
-                                let _ = start_http_listener(listener_host, listener_port).await;
-                            }
-                        },
-                        _ => return Err(anyhow!("Listener type does not exist")),
-                    }
-                },
-                "remove" => {
-                    // First check it's there
-                    if ListenerUtils::check_listener_in_queue(listener_type.clone(), listener_host.clone(), listener_port.clone()) {
-                        // Removing the server from the global variable
-                        // This will also stop the running server
-                        ListenerUtils::remove_listener_from_queue(listener_type.clone(), listener_host.clone(), listener_port.clone()).await;
-                    }
-                },
-                "get" => {
-                    // Get all the active listeners
-                    // if let Ok(listeners) = LISTENERS.lock() {
-                    //     for (index, (_, _, _, _)) in listeners.listeners.clone().iter().enumerate() {
-                    //         // I should turn the output of this into JSON 
-                    //         // So we have a JSON format of all the listeners. Something like this:
-
-                    //         // {
-                    //         //     "Listeners": [
-                    //         //         {
-                    //         //             "index": "0",
-                    //         //             "type": "http",
-                    //         //             "host": "127.0.0.1",
-                    //         //             "port": "1337"
-                    //         //         },
-                    //         //         {
-                    //         //             "index": "1",
-                    //         //             "type": "http",
-                    //         //             "host": "127.0.0.1",
-                    //         //             "port": "1338"
-                    //         //         }
-                    //         //     ]
-                    //         // }
-
-                    //         todo!();
-                    //     }
-                    // }
-                    todo!();
-                }
-                _ => return Err(anyhow!("Method does not exist")),
+            if ListenerUtils::check_listener_in_queue(listener_type.clone(), listener_host.clone(), listener_port.clone()) {
+                // Removing the server from the global variable
+                // This will also stop the running server
+                return ListenerUtils::remove_listener_from_queue(listener_type.clone(), listener_host.clone(), listener_port.clone()).await;
             }
         }
-        Err(anyhow!("Invalid listener call"))
+
+        false
+    }
+
+    pub async fn handle_listener_start(info: String) -> Result<String> {
+        // Adds and starts an active listener
+
+        let msg: Vec<&str> = info.split(":").collect();
+
+        if msg.len() >= 4 {
+            let listener_type = msg[1].to_string();
+            let listener_host = msg[2].to_string();
+            let listener_port = msg[3].to_string(); 
+
+            match listener_type.as_str() {
+                "http" => {
+                    if !ListenerUtils::check_listener_in_queue(listener_type.clone(), listener_host.clone(), listener_port.clone()) {
+                        // Listener is not added yet
+                        if let Ok(_) = start_http_listener(listener_host, listener_port).await {
+                            return Ok(format!("Listener has started"));
+                        }
+                    }
+                },
+                _ => return Err(anyhow!("Listener type does not exist")),
+            }
+
+        }
+
+        Err(anyhow!("Listener couldn't start"))
     }
 }
 
