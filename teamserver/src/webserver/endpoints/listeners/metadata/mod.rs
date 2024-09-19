@@ -20,7 +20,8 @@
 
 use crate::utilities::Utils;
 use crate::encoding::netbios::Netbios;
-use crate::encryption::rsa::Rsa;
+use crate::encoding::sha256::Sha256Hash;
+use crate::encryption::{rsa::Rsa, aes::Aes};
 
 use anyhow::Result;
 
@@ -65,5 +66,16 @@ impl MetaData {
         let decoded_payload = Netbios::decode(data);
         let decrypted_payload = Rsa::decrypt(private_key, decoded_payload)?;
         Ok(Utils::json_to_struct(Utils::convert(&decrypted_payload)?)?)
+    }
+
+    pub fn key(&self) -> [u8; 32] {
+        let hashed_input = Sha256Hash::hash((&self.aes).to_vec());
+        return Aes::transform(hashed_input);
+    }
+
+    pub fn id(&self) -> u32 {
+        let mut output = 0;
+        self.bid.map(|i| output += i as u32);
+        output
     }
 }

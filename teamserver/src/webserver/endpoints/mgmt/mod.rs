@@ -101,7 +101,7 @@ async fn handle_mgmt_call(api: web::Path<String>, body: String, private_key: web
                     match method.as_str() {
                         "add" => {
                             // Adding a listener to the teamserver
-                            if let Ok(res) = Listeners::handle_listener_start(command.clone()).await {
+                            if let Ok(res) = Listeners::handle_listener_start(command.clone(), private_key.get_ref().clone()).await {
                                 // Res needs to be encrypted
 
                                 let response = format_response_payload(command.clone(), res, aes_key);
