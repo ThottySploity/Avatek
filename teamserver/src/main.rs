@@ -62,6 +62,10 @@ pub struct Args {
     /// Password for authentication (to retrieve teamclient keys)
     #[clap(long)]
     password: String,
+
+    /// Key string used for encryption on teamclient side
+    #[clap(long)]
+    key: String,
 }
 
 #[actix::main]
@@ -77,11 +81,13 @@ async fn main() {
 
         // This function will be called if either the keys do not exist yet
         // Or if an operator overwrites the current keys
+
+        // The teamclient keys are superficial as of right now and are not used
+        // This is due to PHP's incompatability with the Rust implementation of RSA.
         Keys::generate(args.force);
     }
 
     if let Ok(private_key) = Rsa::load_private_key("private_key_teamserver") {
-        // Import the keys for the Teamserver to communicate
-        let _ = ManagementServer::start(args.teamserver_ip_address, args.port, args.username, args.password, private_key).await;
+        let _ = ManagementServer::start(args.teamserver_ip_address, args.port, args.username, args.password, args.key, private_key).await;
     }
 }

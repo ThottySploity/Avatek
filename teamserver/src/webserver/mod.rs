@@ -39,6 +39,11 @@ struct Listeners {
     listeners: Vec<(String, String, String, ServerHandle)>
 }
 
+#[derive(Default)]
+pub struct Teamclients {
+    clients: Vec<Teamclient>
+}
+
 // Define a structure to hold the information about the teamclient
 // As the teamclient is dynamic, it will be added once it has authenticated against the teamserver.
 // The teamserver will use this information to proxy Beacon POST requests to the teamclient
@@ -64,5 +69,5 @@ impl Teamclient {
 lazy_static! {
     static ref QUEUE: Mutex<Commands> = Mutex::new(Commands::default());
     static ref LISTENERS: Mutex<Listeners> = Mutex::new(Listeners::default());
-    static ref TEAMCLIENT: Mutex<Teamclient> = Mutex::new(Teamclient::default());
+    static ref TEAMCLIENT: Mutex<Teamclients> = Mutex::new(Teamclients::default());
 }

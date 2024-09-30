@@ -24,7 +24,7 @@ use crate::encoding::base64::Base64;
 use crate::encoding::sha256::Sha256Hash;
 use crate::keys::Keys;
 
-use rsa::{RsaPrivateKey, RsaPublicKey, Pkcs1v15Encrypt};
+use rsa::{RsaPrivateKey, RsaPublicKey, Pkcs1v15Encrypt, Oaep, sha2::Sha256};
 use rsa::pkcs8::{EncodePublicKey, EncodePrivateKey, DecodePublicKey};
 use rsa::pkcs1::{
     EncodeRsaPublicKey, EncodeRsaPrivateKey, LineEnding,
@@ -46,6 +46,11 @@ impl Rsa {
         // Retrieving a public key belonging to a given private key
 
         RsaPublicKey::from(&private_key)
+    }
+
+    pub fn public_key_to_pem(public_key: RsaPublicKey) -> Result<String> {
+        // Converting the public key to PEM
+        Ok(public_key.to_pkcs1_pem(LineEnding::default())?)
     }
 
     pub fn export_private_to_pem(private_key: RsaPrivateKey, name: &str) -> Result<()> {
@@ -104,7 +109,8 @@ impl Rsa {
     pub fn decrypt(private_key: RsaPrivateKey, enc_data: Vec<u8>) -> Result<Vec<u8>> {
         // Decrypting data that was encrypted using the teamservers public RSA key
 
-        let decrypted_data = private_key.decrypt(Pkcs1v15Encrypt, &enc_data)?;
+        let padding = Oaep::new::<Sha256>();
+        let decrypted_data = private_key.decrypt(padding, &enc_data)?;
         Ok(decrypted_data)
     }
 

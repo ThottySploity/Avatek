@@ -28,9 +28,8 @@ impl BeaconDecoder {
         
         if body.contains(":") {
             let msg: Vec<&str> = body.split(":").collect();
-            
-            if msg.len() >= 2 {
 
+            if msg.len() >= 2 {
                 let id = msg[0];
                 let req = msg[1];
 

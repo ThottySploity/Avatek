@@ -18,33 +18,32 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+// use crate::utilities::beacondecoder::BeaconDecoder;
+use crate::webserver::{QUEUE, TEAMCLIENT, Teamclient, endpoints::*, endpoints::listeners::Listeners};
 use crate::utilities::beacondecoder::BeaconDecoder;
-use crate::webserver::{QUEUE, endpoints::*, endpoints::listeners::Listeners};
 
-use log::{debug, error, info};
-use rsa::RsaPrivateKey;
-use actix_web::{web, HttpResponse, HttpRequest, HttpServer, App};
+use log::{debug, info};
+use actix_web::{web, HttpResponse, HttpServer, App};
+use crate::encryption::rc4::Rc4;
+
 
 pub struct ManagementServer;
 
 impl ManagementServer {
-    pub async fn start(ip: String, port: u64, username: String, password: String, private_key: RsaPrivateKey) -> std::io::Result<()> {
-        // Management side webserver
+    pub async fn start(ip: String, port: u64, username: String, password: String, key: String, private_key: RsaPrivateKey) -> std::io::Result<()> {
+        // Management side of Webserver
 
-        info!("Starting 2 management webserver on: {}:{}", ip, port);
+        info!("Starting management server on: {}:{}", ip, port);
 
         HttpServer::new(move || {
             App::new()
-                .app_data(web::Data::new(private_key.clone()))
                 .app_data(web::Data::new(username.clone()))
                 .app_data(web::Data::new(password.clone()))
+                .app_data(web::Data::new(key.as_bytes().to_vec()))
+                .app_data(web::Data::new(private_key.clone()))
 
-                // The route to /mgmt/ and /key/ are static paths
-                // With the introduction of profiles, these will be changable
-
-                .route("/mgmt/{api}", web::post().to(handle_mgmt_call))         // Handle management actions (like queueing jobs for beacons)
-                .route("/key/{action}", web::get().to(handle_key_exchange))     // Retrieving the public key of the teamserver for secure communications
-                .route("/key/{action}", web::post().to(handle_key_exchange))    // Retrieving the private key of the teamclient upon authentication using AES and RSA
+                .route("/mgmt/{api}", web::post().to(handle_mgmt_call))
+                .route("/register/{key}", web::post().to(handle_register_call))
         })
         .bind(&format!("{}:{}", ip, port))?
         .run()
@@ -52,169 +51,110 @@ impl ManagementServer {
     }
 }
 
-async fn handle_mgmt_call(api: web::Path<String>, body: String, private_key: web::Data<RsaPrivateKey>) -> HttpResponse {
+async fn handle_mgmt_call(api: web::Path<String>, body: String, key: web::Data<Vec<u8>>, private_key: web::Data<RsaPrivateKey>) -> HttpResponse {
     // The management function covers everything from starting new HTTP listeners to issueing commands to beacons
     // This function works in a REST API fashion.
 
-    // Requests to this API endpoint follow the following structure:
-    // (Encrypted AES data):(Encrypted AES key):(Signed AES key)
-
     match api.as_str() {
-        // Queueing a job for a beacon to do
-        // Using the Public key of the teamclient we verify the authenticity and integrity of a command
-        
         "queue" => {
-            // Firstly verify the message is from the teamclient
-            if let Err(e) = verify_message(body.clone(), "public_key_teamclient") {
-                error!("{} for queue endpoint", e);
-                return HttpResponse::NotFound().into();
-            }
-
-            // Retrieving the command from the HTTP body
-            if let Ok((command, aes_key)) = retrieve_command(body.clone(), private_key.get_ref().clone()) {
+            // Queueing a job for a beacon
+            if let Ok(command) = retrieve_command_teamclient(body, key.get_ref().clone()) {
                 if let Ok(mut queue) = QUEUE.lock() {
-                    let beacon = BeaconDecoder::new(command.to_string());
+                    let beacon = BeaconDecoder::new(command.clone());
+                
                     debug!("Added a command for beacon: {}", beacon.id());
                     queue.commands.push((beacon.id(), beacon.res()));
                     debug!("Length of queue: {}", queue.commands.len());
-
-                    let encoded_json = encode_in_json(command, format!("Added job for: {}, Length of queue is now: {}", beacon.id(), queue.commands.len()));
-                    let payload = format_payload(encoded_json, aes_key);
+                    
+                    let encoded_teamclient_json = encode_in_json(command, format!("Added job for: {}, Length of queue is now: {}", beacon.id(), queue.commands.len()));
+                    let payload = format_teamclient_payload(encoded_teamclient_json, key.get_ref().clone());
                     return HttpResponse::Ok().body(payload)
                 }
             }
         },
         "listener" => {
-            // Firstly verify the message is from the teamclient
-            if let Err(e) = verify_message(body.clone(), "public_key_teamclient") {
-                error!("{} for listener endpoint", e);
-                return HttpResponse::NotFound().into();
-            }
-
-            // Parse the resulting command to the Listener impl
-            if let Ok((command, aes_key)) = retrieve_command(body.clone(), private_key.get_ref().clone()) {
-
+            // Adding, removing and getting the active listeners on the teamserver
+            
+            if let Ok(command) = retrieve_command_teamclient(body, key.get_ref().clone()) {
                 let msg: Vec<&str> = command.split(":").collect();
                 if msg.len() >= 1 {
                     let method = msg[0].to_string();
-
+                    
                     match method.as_str() {
                         "add" => {
                             // Adding a listener to the teamserver
+                            // The private key serves so that the beacons can encrypt with the teamserver public key
+                            // And the teamserver can decrypt beacon messages.
+                            
                             if let Ok(res) = Listeners::handle_listener_start(command.clone(), private_key.get_ref().clone()).await {
-                                // Res needs to be encrypted
-
-                                let encoded_json = encode_in_json(command.clone(), res);
-                                let payload = format_payload(encoded_json, aes_key);
+                                let encoded_teamclient_json = encode_in_json(command.clone(), res);
+                                let payload = format_teamclient_payload(encoded_teamclient_json, key.get_ref().clone());
                                 return HttpResponse::Ok().body(payload);
                             }
                         },
                         "remove" => {
-                            // Removing any active listener as dictated by the contents of command variable
+                            // Removing a listener from the teamserver
                             if Listeners::handle_listener_remove(command).await {
                                 return HttpResponse::Ok().into();
                             }
-                        },  
+                        },
                         "get" => {
-                            // Getting all the active listeners
+                            // Getting all active listeners
                             if let Ok(list) = Listeners::handle_listener_get().await {
                                 // List needs to be encrypted
                                 let encoded_json = encode_in_json(command.clone(), list);
-                                let payload = format_payload(encoded_json, aes_key);
+                                let payload = format_teamclient_payload(encoded_json, key.get_ref().clone());
                                 return HttpResponse::Ok().body(payload);
                             }
                         },
-                        _ => return HttpResponse::NotFound().into(), 
+                        _ => return HttpResponse::NotFound().into(),
                     };
                 }
-
             }
         },
         _ => return HttpResponse::NotFound().into(),
     };
+
     HttpResponse::NotFound().into()
 }
 
-async fn handle_key_exchange(req: HttpRequest, action: web::Path<String>, body: String, username: web::Data<String>, password: web::Data<String>, private_key: web::Data<RsaPrivateKey>) -> HttpResponse {
-    // Initial connections are not secure, this is why this function exists.
-    // This functions serves the public key of the teamserver to encrypt a message
-    // Retrieving the teamclients private key (through authentication)
-
+async fn handle_register_call(action: web::Path<String>, body: String, username: web::Data<String>, password: web::Data<String>, key: web::Data<Vec<u8>>) -> HttpResponse {
     match action.as_str() {
         "auth" => {
-            // Retrieving the private key of the teamclient (through authentication and encryption)
-            // Ideally you don't want to send the password over in any case, encrypted or not.
-            // You'd rather want to do a Challenge-Response
+            // Teamclient sends a msg to this endpoint with a predefined RC4 key
 
-            if let Ok(encrypted_private_key) = get_encrypted_private_key(
-                body, 
-                username.get_ref().clone(), 
-                password.get_ref().clone(), 
-                private_key.get_ref().clone()
-            ) {
-                // Upon authentication the teamserver should add the peer_addr from "req" to it's TEAMCLIENT variable
-                // This will be used to broadcast the results from beacons to, otherwise the teamserver has no clue where to send data
-                
-                return HttpResponse::Ok().body(Base64::encode(&encrypted_private_key));
-            }
-        },
-        "get" => {
-            // Serving the public key of the teamserver to encrypt data that only the teamserver can read
-            let teamserver_public_key = Rsa::public_key_from_private_key(private_key.get_ref().clone());
-            if let Ok(b64_public_key) = Rsa::public_key_to_string(teamserver_public_key) {
-                return HttpResponse::Ok().body(b64_public_key);
-            }
-        },
-        _ => return HttpResponse::NotFound().into(),
-    };
-
-    
-    HttpResponse::NotFound().into()
-}
-
-fn get_encrypted_private_key(body: String, username: String, password: String, private_key: RsaPrivateKey) -> Result<Vec<u8>> {
-
-    // This function retrieves the private_key of the teamclient that was generated by the teamserver
-    // To exchange this, the teamclient has to authenticate with the username and password of the teamserver (this was chosen at startup of the teamserver)
-    // The data is then transmitted using AES-GCM 
-
-    if body.len() > 0 && body.contains(":") {
-        let msg: Vec<&str> = body.split(":").collect();
-
-        if msg.len() >= 2 {
-
-            let encrypted_req = Base64::decode(&msg[0]);
-            let encrypted_key = Base64::decode(&msg[1]);
-
-            let decrypted_aes_key = Rsa::decrypt(private_key, encrypted_key)?;
-            let aes_key = Aes::transform(decrypted_aes_key);
-            let decrypted_req = Aes::decrypt(aes_key, encrypted_req);
-
-            let plaintext = Utils::convert(&decrypted_req)?.to_string();
-            if plaintext.len() > 0 && plaintext.contains("&") {
+            let decoded_encrypted = Base64::decode(&body);
+            let decrypted_body = Rc4::crypt(decoded_encrypted, key.get_ref().clone());
+            
+            if let Ok(plaintext) = std::str::from_utf8(&decrypted_body) {
                 let msg: Vec<&str> = plaintext.split("&").collect();
 
                 if msg.len() >= 2 {
-                    let req_username = msg[0];
-                    let req_password = msg[1];
+                    let req_username = msg[0].to_string();
+                    let req_password = msg[1].to_string();
+                    let req_host = msg[2].to_string();
+                    let req_port = msg[3].to_string();
+                    let req_endpoint = msg[4].to_string();
 
-                    if req_username == format!("username={}", username) 
-                    && req_password == format!("password={}", password) 
+                    if req_username == format!("username={}", username.get_ref().clone()) 
+                    && req_password == format!("password={}", password.get_ref().clone())
                     {
-                        let private_key_teamclient = Rsa::load_private_key("private_key_teamclient")?;
-                        let b64_private_key = Rsa::private_key_to_string(private_key_teamclient)?;
+                        let teamclient = Teamclient::new(req_host, req_port, req_endpoint);
 
-                        // The teamclient does not yet have a public key, for this reason
-                        // We reuse the AES key that was sent to the teamserver
-                        // This AES key cannot be decrypted in transmission.
-                        // Namely because this AES key was encrypted using RSA
-                        let encrypted_private_key = Aes::encrypt(aes_key, b64_private_key.as_bytes().to_vec());
-                        return Ok(encrypted_private_key);
+                        if let Ok(mut teamclients) = TEAMCLIENT.lock() {
+                            teamclients.clients.push(teamclient);
+                        }
+
+                        let encrypted_resp = Rc4::crypt(format!("Added").as_bytes().to_vec(),key.get_ref().clone());
+                        let encoded = Base64::encode(&encrypted_resp);
+                        return HttpResponse::Ok().body(encoded);
                     }
                 }
             }
-        }
-    }
+        },
+        _ => return HttpResponse::NotFound().into(),
+    };
 
-    Err(anyhow!(""))
+
+    HttpResponse::NotFound().into()
 }
